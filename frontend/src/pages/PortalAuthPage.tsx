@@ -44,18 +44,21 @@ export function PortalAuthPage({ role, mode }: PortalAuthPageProps) {
             phone: form.phone,
           })
         : await api.login({
+            role,
             email: form.email,
             password: form.password,
           });
 
-      if (data.user.role !== role) {
-        throw new Error(`This account belongs to the ${data.user.role === "caregiver" ? "caregiver" : "care seeker"} portal.`);
-      }
-
       setSession(data.token, data.user);
       navigate(role === "caregiver" ? "/caregiver/dashboard" : "/care-seeker/dashboard");
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Unable to continue");
+      setError(
+        isRegister
+          ? requestError instanceof Error
+            ? requestError.message
+            : "Unable to continue"
+          : "Invalid email or password",
+      );
     } finally {
       setSubmitting(false);
     }

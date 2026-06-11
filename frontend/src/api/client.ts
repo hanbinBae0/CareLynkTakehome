@@ -56,7 +56,7 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
-  login(input: { email: string; password: string }) {
+  login(input: { role: "caregiver" | "care_seeker"; email: string; password: string }) {
     return request<SessionResponse>("/auth/login", {
       method: "POST",
       body: JSON.stringify(input),

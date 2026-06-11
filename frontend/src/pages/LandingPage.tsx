@@ -2,42 +2,43 @@ import { Link } from "react-router-dom";
 
 export function LandingPage() {
   return (
-    <div className="shell">
-      <main className="content">
-        <section className="hero-card">
-          <p className="eyebrow">Take-home MVP</p>
-          <h1>Two focused portals for homecare onboarding and matching.</h1>
-          <p className="lead">
-            Caregivers can onboard and publish matchable profiles. Care seekers can complete their profile,
-            create care jobs, and review ranked caregiver matches.
-          </p>
+    <div className="shell landing-shell">
+      <main className="landing-content">
+        <section className="landing-intro">
+          <Link className="brand" to="/">
+            CareLynk
+          </Link>
+          <h1>Find the right care connection.</h1>
+          <p>Choose how you want to continue.</p>
         </section>
 
-        <section className="portal-grid">
-          <article className="portal-card">
-            <h2>Caregiver portal</h2>
-            <p>Register, complete onboarding, and maintain a matchable profile.</p>
-            <div className="card-actions">
-              <Link className="primary-button" to="/caregiver/register">
-                Sign up
-              </Link>
-              <Link className="secondary-button" to="/caregiver/login">
-                Log in
-              </Link>
+        <section className="landing-options">
+          <article className="landing-option">
+            <div>
+              <p className="eyebrow">For Caregivers</p>
+              <h2>Offer care</h2>
+              <p>Create your profile and respond to care requests.</p>
             </div>
+            <Link className="primary-button" to="/caregiver/login">
+              Caregiver portal
+            </Link>
+            <Link className="landing-signup-link" to="/caregiver/register">
+              Create caregiver account
+            </Link>
           </article>
 
-          <article className="portal-card">
-            <h2>Care seeker portal</h2>
-            <p>Complete your profile, create jobs, and view matched caregivers.</p>
-            <div className="card-actions">
-              <Link className="primary-button" to="/care-seeker/register">
-                Sign up
-              </Link>
-              <Link className="secondary-button" to="/care-seeker/login">
-                Log in
-              </Link>
+          <article className="landing-option">
+            <div>
+              <p className="eyebrow">For Care Seekers</p>
+              <h2>Find care</h2>
+              <p>Create a care job and connect with matching caregivers.</p>
             </div>
+            <Link className="primary-button" to="/care-seeker/login">
+              Care seeker portal
+            </Link>
+            <Link className="landing-signup-link" to="/care-seeker/register">
+              Create care seeker account
+            </Link>
           </article>
         </section>
       </main>

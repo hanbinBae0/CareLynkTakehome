@@ -47,7 +47,11 @@ export async function register(input: RegisterInput) {
 export async function login(input: LoginInput) {
   const foundUser = await userRepository.findUserRowByEmail(input.email);
 
-  if (!foundUser || !verifyPassword(input.password, foundUser.password_hash)) {
+  if (
+    !foundUser ||
+    !verifyPassword(input.password, foundUser.password_hash) ||
+    foundUser.role !== input.role
+  ) {
     throw new AppError("Invalid email or password", 401);
   }
 

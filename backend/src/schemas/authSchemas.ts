@@ -10,6 +10,7 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
+  role: z.enum(["caregiver", "care_seeker"]),
   email: z.string().email(),
   password: z.string().min(8),
 });
