@@ -72,6 +72,31 @@ button {
   gap: 12px;
 }
 
+.portal-nav {
+  max-width: 1180px;
+  margin: 0 auto 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(19, 37, 61, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.portal-nav-link {
+  padding: 0.7rem 1rem;
+  border-radius: 12px;
+  color: #637489;
+  font-weight: 700;
+}
+
+.portal-nav-link:hover,
+.portal-nav-link.active {
+  background: #13253d;
+  color: #ffffff;
+}
+
 .hero-card,
 .panel,
 .portal-card,
@@ -122,6 +147,49 @@ button {
 
 .dashboard-grid {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
+.dashboard-summary-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+
+.dashboard-summary-card h2,
+.dashboard-summary-card p {
+  margin: 0;
+}
+
+.dashboard-summary-card .primary-button,
+.dashboard-summary-card .secondary-button {
+  justify-self: start;
+}
+
+.dashboard-metric {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.dashboard-metric strong {
+  font-size: 2rem;
+}
+
+.dashboard-request-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(19, 37, 61, 0.08);
+}
+
+.dashboard-request-row:last-child {
+  border-bottom: 0;
+}
+
+.dashboard-request-row p {
+  margin: 4px 0 0;
 }
 
 .portal-card,
@@ -183,6 +251,19 @@ button {
   gap: 16px;
 }
 
+.form-fieldset {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.form-fieldset:disabled {
+  opacity: 0.72;
+}
+
 .field {
   display: grid;
   gap: 8px;
@@ -213,11 +294,6 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
-.availability-row {
-  grid-template-columns: 1.2fr 1fr 1fr auto;
-  align-items: end;
-}
-
 .availability-group {
   display: grid;
   gap: 12px;
@@ -225,6 +301,129 @@ button {
   border: 1px solid rgba(19, 37, 61, 0.08);
   border-radius: 18px;
   background: rgba(248, 250, 252, 0.7);
+}
+
+.schedule-presets {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 18px;
+  background: #edf3f8;
+}
+
+.weekly-schedule {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-day {
+  overflow: hidden;
+  border: 1px solid rgba(19, 37, 61, 0.1);
+  border-radius: 18px;
+  background: rgba(248, 250, 252, 0.75);
+}
+
+.schedule-day.active {
+  border-color: rgba(33, 104, 68, 0.28);
+  background: rgba(220, 239, 220, 0.22);
+}
+
+.schedule-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+}
+
+.day-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.day-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.day-toggle-control {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  transition: background 140ms ease;
+}
+
+.day-toggle-control::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 5px rgba(19, 37, 61, 0.2);
+  transition: transform 140ms ease;
+}
+
+.day-toggle input:checked + .day-toggle-control {
+  background: #216844;
+}
+
+.day-toggle input:checked + .day-toggle-control::after {
+  transform: translateX(20px);
+}
+
+.day-toggle input:focus-visible + .day-toggle-control {
+  outline: 3px solid rgba(19, 37, 61, 0.25);
+  outline-offset: 3px;
+}
+
+.schedule-day-status {
+  color: #637489;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.day-periods {
+  display: grid;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.time-period-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.add-period-button,
+.remove-period-button {
+  width: fit-content;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.add-period-button {
+  color: #216844;
+  background: rgba(220, 239, 220, 0.8);
+}
+
+.remove-period-button {
+  color: #7d2b2b;
+  background: #f8eded;
 }
 
 .saved-slot-list {
@@ -314,7 +513,8 @@ button {
 }
 
 .job-card,
-.match-card {
+.match-card,
+.request-card {
   padding: 18px 20px;
 }
 
@@ -366,6 +566,48 @@ button {
   color: #885c00;
 }
 
+.status-chip.pending {
+  background: #fff1d9;
+  color: #885c00;
+}
+
+.status-chip.accepted {
+  background: #dcefdc;
+  color: #216844;
+}
+
+.status-chip.declined,
+.status-chip.cancelled {
+  background: #f2e3e3;
+  color: #7d2b2b;
+}
+
+.request-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.request-card {
+  border: 1px solid rgba(19, 37, 61, 0.08);
+  border-radius: 20px;
+  background: #ffffff;
+}
+
+.contact-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(220, 239, 220, 0.45);
+  color: #216844;
+}
+
+.profile-actions {
+  margin-bottom: 20px;
+}
+
 .user-badge {
   background: rgba(19, 37, 61, 0.08);
   color: #13253d;
@@ -410,9 +652,13 @@ button {
   .topbar,
   .job-card,
   .match-card-header,
-  .availability-row {
+  .time-period-row {
     grid-template-columns: 1fr;
     display: grid;
+  }
+
+  .schedule-day-header {
+    align-items: flex-start;
   }
 
   .card-actions,

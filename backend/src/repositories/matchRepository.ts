@@ -25,6 +25,23 @@ export async function replaceMatches(
   }
 }
 
+export async function matchExists(
+  jobId: string,
+  caregiverUserId: string,
+  db: Queryable = pool,
+): Promise<boolean> {
+  const result = await db.query(
+    `
+      SELECT 1
+      FROM job_matches
+      WHERE job_id = $1 AND caregiver_user_id = $2
+    `,
+    [jobId, caregiverUserId],
+  );
+
+  return result.rowCount === 1;
+}
+
 export async function attachStoredMatches(
   matches: MatchResult[],
   jobId: string,

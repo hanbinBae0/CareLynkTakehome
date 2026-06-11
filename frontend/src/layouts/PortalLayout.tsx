@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -34,6 +34,57 @@ export function PortalLayout({ title, subtitle, children }: PortalLayoutProps) {
           )}
         </div>
       </header>
+      {user?.role === "caregiver" && (
+        <nav className="portal-nav" aria-label="Caregiver portal">
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            to="/caregiver/dashboard"
+          >
+            Dashboard
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            to="/caregiver/profile"
+          >
+            Profile
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            to="/caregiver/requests"
+          >
+            Care requests
+          </NavLink>
+        </nav>
+      )}
+      {user?.role === "care_seeker" && (
+        <nav className="portal-nav" aria-label="Care seeker portal">
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            to="/care-seeker/dashboard"
+          >
+            Dashboard
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            to="/care-seeker/profile"
+          >
+            Profile
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            end
+            to="/care-seeker/jobs"
+          >
+            My jobs
+          </NavLink>
+          <NavLink
+            className={({ isActive }) => (isActive ? "portal-nav-link active" : "portal-nav-link")}
+            to="/care-seeker/jobs/new"
+          >
+            Create job
+          </NavLink>
+        </nav>
+      )}
       <main className="content">
         <section className="hero-card">
           <p className="eyebrow">Homecare MVP</p>

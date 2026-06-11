@@ -1,15 +1,11 @@
 import * as caregiverRepository from "../repositories/caregiverRepository";
 import * as jobRepository from "../repositories/jobRepository";
 import * as matchRepository from "../repositories/matchRepository";
-import { MatchResult } from "../types/domain";
+import { Job, MatchResult } from "../types/domain";
 import { AppError } from "../utils/errors";
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
-}
-
-function weekdayOverlap(jobDays: number[], caregiverDays: number[]) {
-  return jobDays.filter((day) => caregiverDays.includes(day));
 }
 
 function toMinutes(value: string): number {
@@ -26,6 +22,73 @@ function timeRangesOverlap(
   return toMinutes(leftStart) < toMinutes(rightEnd) && toMinutes(rightStart) < toMinutes(leftEnd);
 }
 
+function locationMatches(caregiverState: string, jobState: string): boolean {
+  return normalize(caregiverState) === normalize(jobState);
+}
+
+function availabilityMatches(
+  caregiver: MatchResult["caregiver"],
+  job: Job,
+): boolean {
+  if (job.requestedAvailabilities.length > 0) {
+    return job.requestedAvailabilities.every((requestedSlot) =>
+      caregiver.availabilities.some(
+        (caregiverSlot) =>
+          caregiverSlot.weekday === requestedSlot.weekday &&
+          timeRangesOverlap(
+            caregiverSlot.startTime,
+            caregiverSlot.endTime,
+            requestedSlot.startTime,
+            requestedSlot.endTime,
+          ),
+      ),
+    );
+  }
+
+  const hasRequestedDays = job.requestedWeekdays.length > 0;
+  const hasTimeWindow = Boolean(job.preferredStartTime && job.preferredEndTime);
+
+  if (!hasRequestedDays && !hasTimeWindow) {
+    return true;
+  }
+
+  return caregiver.availabilities.some((slot) => {
+    const matchesDay = !hasRequestedDays || job.requestedWeekdays.includes(slot.weekday);
+    const matchesTime =
+      !hasTimeWindow ||
+      timeRangesOverlap(slot.startTime, slot.endTime, job.preferredStartTime!, job.preferredEndTime!);
+
+    return matchesDay && matchesTime;
+  });
+}
+
+function requirementMatchesText(requirement: string, value: string): boolean {
+  const normalizedRequirement = normalize(requirement);
+  const normalizedValue = normalize(value);
+
+  return (
+    normalizedValue === normalizedRequirement ||
+    normalizedValue.includes(normalizedRequirement) ||
+    normalizedRequirement.includes(normalizedValue)
+  );
+}
+
+function requiredSkillsMatch(caregiver: MatchResult["caregiver"], requiredSkills: string[]): string[] | null {
+  if (requiredSkills.length === 0) {
+    return [];
+  }
+
+  const experienceText = [caregiver.headline, caregiver.bio].join(" ");
+  const matchedRequirements = requiredSkills.filter((requiredSkill) => {
+    return (
+      caregiver.skills.some((skill) => requirementMatchesText(requiredSkill, skill)) ||
+      requirementMatchesText(requiredSkill, experienceText)
+    );
+  });
+
+  return matchedRequirements.length === requiredSkills.length ? matchedRequirements : null;
+}
+
 export async function recomputeMatches(jobId: string, careSeekerUserId: string): Promise<MatchResult[]> {
   const job = await jobRepository.findById(jobId, careSeekerUserId);
 
@@ -37,72 +100,55 @@ export async function recomputeMatches(jobId: string, careSeekerUserId: string):
 
   const matches = caregivers
     .map<MatchResult | null>((caregiver) => {
-      let score = 0;
       const reasons: string[] = [];
+      const matchesLocation = locationMatches(caregiver.state, job.locationState);
+      const matchesAvailability = availabilityMatches(caregiver, job);
+      const matchedSkills = requiredSkillsMatch(caregiver, job.requiredSkills);
 
-      const sameState = normalize(caregiver.state) === normalize(job.locationState);
-      const sameCity = normalize(caregiver.city) === normalize(job.locationCity);
-
-      if (sameState && sameCity) {
-        score += 40;
-        reasons.push("Same city and state");
-      } else if (sameState) {
-        score += 20;
-        reasons.push("Same state");
-      }
-
-      const jobSkills = new Set(job.requiredSkills.map(normalize));
-      const sharedSkills = caregiver.skills.filter((skill) => jobSkills.has(normalize(skill)));
-
-      if (sharedSkills.length > 0) {
-        score += Math.min(sharedSkills.length * 15, 30);
-        reasons.push(`Shared skills: ${sharedSkills.join(", ")}`);
-      }
-
-      const caregiverDays = caregiver.availabilities.map((slot) => slot.weekday);
-      const sharedDays = weekdayOverlap(job.requestedWeekdays, caregiverDays);
-      const hasTimeWindow = Boolean(job.preferredStartTime && job.preferredEndTime);
-      const overlappingAvailability = caregiver.availabilities.filter((slot) => {
-        const matchesDay = job.requestedWeekdays.length === 0 || job.requestedWeekdays.includes(slot.weekday);
-        const matchesTime =
-          !hasTimeWindow ||
-          timeRangesOverlap(slot.startTime, slot.endTime, job.preferredStartTime!, job.preferredEndTime!);
-
-        return matchesDay && matchesTime;
-      });
-
-      if (job.requestedWeekdays.length === 0 && !hasTimeWindow) {
-        score += 10;
-        reasons.push("Flexible requested schedule");
-      } else if (overlappingAvailability.length > 0) {
-        score += 25;
-        reasons.push(
-          hasTimeWindow
-            ? "Availability overlaps requested days and preferred time window"
-            : "Availability overlaps requested weekdays",
-        );
-      } else if (sharedDays.length > 0) {
-        reasons.push("Available on the right days, but outside the preferred time window");
-      }
-
-      if (caregiver.yearsExperience >= 2) {
-        score += 5;
-        reasons.push("Has prior care experience");
-      }
-
-      if (score < 35) {
+      if (!matchesLocation || !matchesAvailability || matchedSkills === null) {
         return null;
+      }
+
+      reasons.push("Same state");
+
+      if (
+        job.requestedAvailabilities.length === 0 &&
+        job.requestedWeekdays.length === 0 &&
+        !job.preferredStartTime &&
+        !job.preferredEndTime
+      ) {
+        reasons.push("Flexible requested schedule");
+      } else {
+        reasons.push("Availability overlaps requested schedule");
+      }
+
+      if (matchedSkills.length > 0) {
+        reasons.push(`Meets required skills: ${matchedSkills.join(", ")}`);
+      } else {
+        reasons.push("No required skills specified");
       }
 
       return {
         caregiverUserId: caregiver.userId,
-        score,
+        score: 1,
         reasons,
         caregiver,
       };
     })
     .filter((value): value is MatchResult => value !== null)
-    .sort((left, right) => right.score - left.score);
+    .sort((left, right) => {
+      const byLastName = left.caregiver.lastName.localeCompare(right.caregiver.lastName);
+      if (byLastName !== 0) {
+        return byLastName;
+      }
+
+      const byFirstName = left.caregiver.firstName.localeCompare(right.caregiver.firstName);
+      if (byFirstName !== 0) {
+        return byFirstName;
+      }
+
+      return left.caregiverUserId.localeCompare(right.caregiverUserId);
+    });
 
   await matchRepository.replaceMatches(
     jobId,
@@ -112,8 +158,6 @@ export async function recomputeMatches(jobId: string, careSeekerUserId: string):
       reasons: match.reasons,
     })),
   );
-
-  await jobRepository.updateStatus(jobId, matches.length > 0 ? "matched" : "open");
 
   return matches;
 }

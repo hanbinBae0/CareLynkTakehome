@@ -34,3 +34,14 @@ export async function getMatches(request: Request, response: Response) {
   const matches = await jobService.getJobMatches(getJobIdParam(request), request.user!.id);
   return response.json({ data: matches });
 }
+
+export async function updateJob(request: Request, response: Response) {
+  const input = createJobSchema.parse(request.body);
+  const result = await jobService.updateJob(getJobIdParam(request), request.user!.id, input);
+  return response.json({ data: result });
+}
+
+export async function deleteJob(request: Request, response: Response) {
+  await jobService.deleteJob(getJobIdParam(request), request.user!.id);
+  return response.status(204).send();
+}

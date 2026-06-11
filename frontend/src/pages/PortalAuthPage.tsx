@@ -53,7 +53,7 @@ export function PortalAuthPage({ role, mode }: PortalAuthPageProps) {
       }
 
       setSession(data.token, data.user);
-      navigate(role === "caregiver" ? "/caregiver/profile" : "/care-seeker/dashboard");
+      navigate(role === "caregiver" ? "/caregiver/dashboard" : "/care-seeker/dashboard");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to continue");
     } finally {

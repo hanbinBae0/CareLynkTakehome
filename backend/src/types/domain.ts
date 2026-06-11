@@ -56,12 +56,11 @@ export interface Job {
   locationCity: string;
   locationState: string;
   zipCode: string;
-  scheduleSummary: string;
-  frequency: string;
   duration: string;
   requestedWeekdays: number[];
   preferredStartTime: string | null;
   preferredEndTime: string | null;
+  requestedAvailabilities: AvailabilitySlot[];
   requiredSkills: string[];
   notes: string;
   status: "open" | "matched" | "closed";
@@ -73,5 +72,43 @@ export interface MatchResult {
   score: number;
   reasons: string[];
   caregiver: CaregiverProfile;
+}
+
+export type JobRequestStatus = "pending" | "accepted" | "declined" | "cancelled";
+
+export interface CareSeekerJobRequest {
+  id: string;
+  jobId: string;
+  caregiverUserId: string;
+  status: JobRequestStatus;
+  message: string;
+  createdAt: string;
+  respondedAt: string | null;
+  caregiver: {
+    firstName: string;
+    lastName: string;
+    headline: string;
+  };
+}
+
+export interface CaregiverJobRequest {
+  id: string;
+  jobId: string;
+  caregiverUserId: string;
+  status: JobRequestStatus;
+  message: string;
+  createdAt: string;
+  respondedAt: string | null;
+  job: Job;
+  careSeeker: {
+    userId: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    phone: string;
+    preferredContactMethod: string;
+    careRecipientName: string;
+    relationshipToRecipient: string;
+  };
 }
 

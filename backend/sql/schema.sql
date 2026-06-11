@@ -8,6 +8,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'job_status') THEN
     CREATE TYPE job_status AS ENUM ('open', 'matched', 'closed');
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'request_status') THEN
+    CREATE TYPE request_status AS ENUM ('pending', 'accepted', 'declined', 'cancelled');
+  END IF;
 END$$;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -69,12 +72,13 @@ CREATE TABLE IF NOT EXISTS jobs (
   location_city TEXT NOT NULL,
   location_state TEXT NOT NULL,
   zip_code TEXT NOT NULL DEFAULT '',
-  schedule_summary TEXT NOT NULL,
-  frequency TEXT NOT NULL,
+  schedule_summary TEXT NOT NULL DEFAULT '',
+  frequency TEXT NOT NULL DEFAULT '',
   duration TEXT NOT NULL,
   requested_weekdays SMALLINT[] NOT NULL DEFAULT '{}',
   preferred_start_time TIME,
   preferred_end_time TIME,
+  requested_availabilities JSONB NOT NULL DEFAULT '[]'::jsonb,
   required_skills TEXT[] NOT NULL DEFAULT '{}',
   notes TEXT NOT NULL DEFAULT '',
   status job_status NOT NULL DEFAULT 'open',
@@ -87,6 +91,13 @@ CREATE TABLE IF NOT EXISTS jobs (
   )
 );
 
+ALTER TABLE jobs
+ADD COLUMN IF NOT EXISTS requested_availabilities JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE jobs
+ALTER COLUMN schedule_summary SET DEFAULT '',
+ALTER COLUMN frequency SET DEFAULT '';
+
 CREATE TABLE IF NOT EXISTS job_matches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -97,8 +108,35 @@ CREATE TABLE IF NOT EXISTS job_matches (
   UNIQUE (job_id, caregiver_user_id)
 );
 
+CREATE TABLE IF NOT EXISTS job_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  caregiver_user_id UUID NOT NULL REFERENCES caregiver_profiles(user_id) ON DELETE CASCADE,
+  status request_status NOT NULL DEFAULT 'pending',
+  message TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  responded_at TIMESTAMPTZ,
+  UNIQUE (job_id, caregiver_user_id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_jobs_care_seeker_user_id ON jobs(care_seeker_user_id);
 CREATE INDEX IF NOT EXISTS idx_job_matches_job_id ON job_matches(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_requests_job_id ON job_requests(job_id);
+CREATE INDEX IF NOT EXISTS idx_job_requests_caregiver_user_id ON job_requests(caregiver_user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_job_requests_one_accepted
+  ON job_requests(job_id)
+  WHERE status = 'accepted';
 CREATE INDEX IF NOT EXISTS idx_caregiver_availability_user_id ON caregiver_availabilities(caregiver_user_id);
+
+UPDATE jobs
+SET status = 'open',
+    updated_at = NOW()
+WHERE status = 'matched'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM job_requests
+    WHERE job_requests.job_id = jobs.id
+      AND job_requests.status = 'accepted'
+  );
 

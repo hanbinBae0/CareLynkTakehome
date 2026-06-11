@@ -1,5 +1,4 @@
 import { FormEvent, useEffect, useState } from "react";
-
 import { api } from "../api/client";
 import { InputField } from "../components/InputField";
 import { TextAreaField } from "../components/TextAreaField";
@@ -7,8 +6,13 @@ import { useAuth } from "../context/AuthContext";
 import { PortalLayout } from "../layouts/PortalLayout";
 import { AvailabilitySlot, CaregiverProfile } from "../types/api";
 
-const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const defaultAvailability: AvailabilitySlot = { weekday: 1, startTime: "09:00", endTime: "17:00" };
+const schedulePresets = [
+  { label: "Weekdays", days: [1, 2, 3, 4, 5] },
+  { label: "Weekends", days: [0, 6] },
+  { label: "Every day", days: [0, 1, 2, 3, 4, 5, 6] },
+];
 
 interface EditableAvailabilitySlot extends AvailabilitySlot {
   uiId: string;
@@ -74,6 +78,18 @@ function findDuplicateAvailability(slots: AvailabilitySlot[]) {
   }
 
   return null;
+}
+
+function findInvalidAvailability(slots: AvailabilitySlot[]) {
+  return slots.find((slot) => slot.startTime >= slot.endTime) ?? null;
+}
+
+function createDefaultSlot(weekday: number): EditableAvailabilitySlot {
+  return createEditableAvailability({
+    weekday,
+    startTime: defaultAvailability.startTime,
+    endTime: defaultAvailability.endTime,
+  });
 }
 
 function createSavedSnapshot(profile: LocalCaregiverProfile, skillsText: string, certificationsText: string): SavedProfileSnapshot {
@@ -154,31 +170,64 @@ export function CaregiverProfilePage() {
       });
   }, [token]);
 
-  function updateAvailability(index: number, patch: Partial<AvailabilitySlot>) {
-    const next = [...profile.availabilities];
-    next[index] = { ...next[index], ...patch };
+  function updateAvailability(uiId: string, patch: Partial<AvailabilitySlot>) {
     setError("");
-    setProfile({ ...profile, availabilities: next });
+    setProfile({
+      ...profile,
+      availabilities: profile.availabilities.map((slot) =>
+        slot.uiId === uiId ? { ...slot, ...patch } : slot,
+      ),
+    });
   }
 
-  function addAvailability() {
-    const duplicateDefault = profile.availabilities.some((slot) => availabilityKey(slot) === availabilityKey(defaultAvailability));
-
-    if (duplicateDefault) {
-      setError("This Monday 09:00-17:00 slot already exists. Edit an existing row instead of adding the same slot twice.");
-      return;
-    }
+  function toggleDay(weekday: number) {
+    const dayIsEnabled = profile.availabilities.some((slot) => slot.weekday === weekday);
 
     setError("");
     setProfile({
       ...profile,
-      availabilities: [...profile.availabilities, createEditableAvailability(defaultAvailability)],
+      availabilities: dayIsEnabled
+        ? profile.availabilities.filter((slot) => slot.weekday !== weekday)
+        : [...profile.availabilities, createDefaultSlot(weekday)],
     });
   }
 
-  const savedAvailabilityKeys = new Set(
-    savedProfileSnapshot.profile.availabilities.map((slot) => availabilityKey(slot)),
-  );
+  function addAvailability(weekday: number) {
+    const daySlots = profile.availabilities.filter((slot) => slot.weekday === weekday);
+    const suggestedPeriods = [
+      { startTime: "09:00", endTime: "12:00" },
+      { startTime: "13:00", endTime: "17:00" },
+      { startTime: "18:00", endTime: "20:00" },
+    ];
+    const suggestion = suggestedPeriods.find(
+      (period) =>
+        !daySlots.some(
+          (slot) => slot.startTime === period.startTime && slot.endTime === period.endTime,
+        ),
+    );
+
+    setError("");
+    setProfile({
+      ...profile,
+      availabilities: [
+        ...profile.availabilities,
+        createEditableAvailability({
+          weekday,
+          startTime: suggestion?.startTime ?? "20:00",
+          endTime: suggestion?.endTime ?? "22:00",
+        }),
+      ],
+    });
+  }
+
+  function applySchedulePreset(days: number[]) {
+    setError("");
+    setProfile({
+      ...profile,
+      availabilities: days.map(createDefaultSlot),
+    });
+  }
+
   const savedSlots = savedProfileSnapshot.profile.availabilities.map((slot) => ({
     ...slot,
     label: summarizeAvailability(slot),
@@ -195,6 +244,15 @@ export function CaregiverProfilePage() {
 
     setError("");
     setMessage("");
+
+    const invalidAvailability = findInvalidAvailability(profile.availabilities);
+
+    if (invalidAvailability) {
+      setError(
+        `${weekdays[invalidAvailability.weekday]} availability must end after it starts.`,
+      );
+      return;
+    }
 
     const duplicateAvailability = findDuplicateAvailability(profile.availabilities);
 
@@ -250,6 +308,10 @@ export function CaregiverProfilePage() {
   return (
     <PortalLayout title="Caregiver onboarding" subtitle="Profile, availability, and qualifications">
       <section className="panel">
+        <div className="profile-actions">
+          <h2>Caregiver profile</h2>
+          <p className="muted">Keep your profile current so care seekers can find the right match.</p>
+        </div>
         <form className="stack" onSubmit={handleSubmit}>
           {hasUnsavedChanges && (
             <div className="draft-banner">
@@ -291,20 +353,36 @@ export function CaregiverProfilePage() {
             <div className="section-row">
               <div>
                 <h3>Availability</h3>
-                <p className="muted">Saved slots are shown separately from your current editable draft.</p>
+                <p className="muted">Choose available days, then adjust the time periods for each day.</p>
               </div>
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={addAvailability}
-              >
-                Add another time slot
-              </button>
             </div>
 
-            <div className="availability-group">
+            <div className="schedule-presets" aria-label="Availability presets">
+              <span className="field-label">Quick setup</span>
+              <div className="pills">
+                {schedulePresets.map((preset) => (
+                  <button
+                    className="pill"
+                    key={preset.label}
+                    onClick={() => applySchedulePreset(preset.days)}
+                    type="button"
+                  >
+                    {preset.label} 9–5
+                  </button>
+                ))}
+                <button
+                  className="pill"
+                  onClick={() => setProfile({ ...profile, availabilities: [] })}
+                  type="button"
+                >
+                  Clear all
+                </button>
+              </div>
+            </div>
+
+            <div className="availability-group saved-availability-summary">
               <div className="section-row">
-                <h4>Saved slots</h4>
+                <h4>Currently saved</h4>
                 <span className="status-pill saved">Persisted</span>
               </div>
               {savedSlots.length === 0 ? (
@@ -320,46 +398,84 @@ export function CaregiverProfilePage() {
               )}
             </div>
 
-            <div className="availability-group">
+            <div className="weekly-schedule">
               <div className="section-row">
-                <h4>Current draft</h4>
+                <h4>Weekly schedule</h4>
                 <span className="status-pill draft">Editable</span>
               </div>
-              <p className="muted">Review and save this draft to replace the currently saved availability.</p>
+              <p className="muted">Turn a day on to make it available. Add another period for split shifts.</p>
 
-            {profile.availabilities.map((slot, index) => (
-              <div className={`grid availability-row ${savedAvailabilityKeys.has(availabilityKey(slot)) ? "saved-row" : "new-row"}`} key={slot.uiId}>
-                <div className="availability-row-header">
-                  <span className={savedAvailabilityKeys.has(availabilityKey(slot)) ? "status-pill saved" : "status-pill unsaved"}>
-                    {savedAvailabilityKeys.has(availabilityKey(slot)) ? "Saved in profile" : "Unsaved draft"}
-                  </span>
-                </div>
-                <label className="field">
-                  <span>Day</span>
-                  <select value={slot.weekday} onChange={(event) => updateAvailability(index, { weekday: Number(event.target.value) })}>
-                    {weekdays.map((day, dayIndex) => (
-                      <option key={day} value={dayIndex}>
-                        {day}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <InputField label="Start" type="time" value={slot.startTime} onChange={(value) => updateAvailability(index, { startTime: value })} />
-                <InputField label="End" type="time" value={slot.endTime} onChange={(value) => updateAvailability(index, { endTime: value })} />
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() =>
-                    setProfile({
-                      ...profile,
-                      availabilities: profile.availabilities.filter((_, availabilityIndex) => availabilityIndex !== index),
-                    })
-                  }
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+              {weekdays.map((day, weekday) => {
+                const daySlots = profile.availabilities
+                  .filter((slot) => slot.weekday === weekday)
+                  .sort((left, right) => left.startTime.localeCompare(right.startTime));
+                const dayIsEnabled = daySlots.length > 0;
+
+                return (
+                  <section
+                    className={dayIsEnabled ? "schedule-day active" : "schedule-day"}
+                    key={day}
+                  >
+                    <div className="schedule-day-header">
+                      <label className="day-toggle">
+                        <input
+                          checked={dayIsEnabled}
+                          onChange={() => toggleDay(weekday)}
+                          type="checkbox"
+                        />
+                        <span className="day-toggle-control" aria-hidden="true" />
+                        <span>{day}</span>
+                      </label>
+                      <span className="schedule-day-status">
+                        {dayIsEnabled ? `${daySlots.length} period${daySlots.length === 1 ? "" : "s"}` : "Unavailable"}
+                      </span>
+                    </div>
+
+                    {dayIsEnabled && (
+                      <div className="day-periods">
+                        {daySlots.map((slot) => (
+                          <div className="time-period-row" key={slot.uiId}>
+                            <InputField
+                              label="From"
+                              type="time"
+                              value={slot.startTime}
+                              onChange={(value) => updateAvailability(slot.uiId, { startTime: value })}
+                            />
+                            <InputField
+                              label="To"
+                              type="time"
+                              value={slot.endTime}
+                              onChange={(value) => updateAvailability(slot.uiId, { endTime: value })}
+                            />
+                            <button
+                              aria-label={`Remove ${day} ${slot.startTime} to ${slot.endTime}`}
+                              className="remove-period-button"
+                              onClick={() =>
+                                setProfile({
+                                  ...profile,
+                                  availabilities: profile.availabilities.filter(
+                                    (availability) => availability.uiId !== slot.uiId,
+                                  ),
+                                })
+                              }
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          className="add-period-button"
+                          onClick={() => addAvailability(weekday)}
+                          type="button"
+                        >
+                          + Add another period
+                        </button>
+                      </div>
+                    )}
+                  </section>
+                );
+              })}
             </div>
           </div>
 

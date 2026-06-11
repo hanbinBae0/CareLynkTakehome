@@ -1,6 +1,8 @@
 import {
   ApiEnvelope,
+  CaregiverJobRequest,
   CaregiverProfile,
+  CareSeekerJobRequest,
   CareSeekerProfile,
   Job,
   MatchResult,
@@ -26,6 +28,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     ...options,
     headers,
   });
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
 
   const payload = (await response.json()) as ApiEnvelope<T> & { error?: string };
 
@@ -89,6 +95,23 @@ export const api = {
       body: JSON.stringify(input),
     });
   },
+  updateJob(
+    token: string,
+    jobId: string,
+    input: Omit<Job, "id" | "careSeekerUserId" | "status" | "createdAt">,
+  ) {
+    return request<{ job: Job; matches: MatchResult[] }>(`/jobs/${jobId}`, {
+      method: "PUT",
+      token,
+      body: JSON.stringify(input),
+    });
+  },
+  deleteJob(token: string, jobId: string) {
+    return request<void>(`/jobs/${jobId}`, {
+      method: "DELETE",
+      token,
+    });
+  },
   listJobs(token: string) {
     return request<Job[]>("/jobs", { token });
   },
@@ -97,6 +120,32 @@ export const api = {
   },
   getMatches(token: string, jobId: string) {
     return request<MatchResult[]>(`/jobs/${jobId}/matches`, { token });
+  },
+  listJobRequests(token: string, jobId: string) {
+    return request<CareSeekerJobRequest[]>(`/jobs/${jobId}/requests`, { token });
+  },
+  sendJobRequest(token: string, jobId: string, caregiverUserId: string, message: string) {
+    return request<CareSeekerJobRequest>(`/jobs/${jobId}/requests`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ caregiverUserId, message }),
+    });
+  },
+  cancelJobRequest(token: string, jobId: string, requestId: string) {
+    return request<void>(`/jobs/${jobId}/requests/${requestId}`, {
+      method: "DELETE",
+      token,
+    });
+  },
+  listCaregiverRequests(token: string) {
+    return request<CaregiverJobRequest[]>("/caregiver/requests", { token });
+  },
+  respondToJobRequest(token: string, requestId: string, status: "accepted" | "declined") {
+    return request<CaregiverJobRequest>(`/caregiver/requests/${requestId}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify({ status }),
+    });
   },
 };
 
