@@ -127,15 +127,15 @@ Portal separation:
 
 ## 6. Matching Logic
 
-The MVP uses a deterministic scoring model:
+The MVP uses a deterministic matching algorithm with the following rules:
 
-- Strong score boost for same city/state
-- Medium score for same state
-- Score for overlapping required skills
-- Score for overlapping requested weekdays and preferred time windows
-- Small score for caregivers with meaningful experience
+- Caregiver state must match the job state
+- Caregiver availability must overlap the requested schedule
+- Required skills must match caregiver skills or appear in the caregiver’s headline/bio
+- Matching results are stored in `job_matches`
+- All matches currently receive the same score and are sorted by caregiver name
 
-Computed matches are stored in `job_matches` and returned in descending score order.
+Computed matches are stored in `job_matches` and returned alphabetically by caregiver last name, then first name.
 
 ## 7. Setup
 
