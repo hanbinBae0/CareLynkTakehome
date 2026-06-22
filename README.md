@@ -187,6 +187,38 @@ psql "postgres://postgres:postgres@localhost:5432/carelynk" -f backend/sql/schem
 
 If `createdb carelynk` reports that the database already exists, keep the existing database or recreate it manually.
 
+### Seed Reviewer Data
+
+After configuring `backend/.env`, run:
+
+```bash
+npm run db:seed
+```
+
+The command applies the schema, resets only the demo accounts below, and
+creates profiles, availability, jobs, computed matches, and request states. It
+is safe to run repeatedly.
+
+All demo accounts use:
+
+```text
+Password: CareLynk123!
+```
+
+| Account | Portal | Purpose |
+| --- | --- | --- |
+| `seeker.demo@carelynk.test` | Care seeker | Completed profile, three jobs, matches, and request workflows |
+| `caregiver.demo@carelynk.test` | Caregiver | Completed companionship and meal-support profile with a pending request |
+| `caregiver.james@carelynk.test` | Caregiver | Completed dementia-care profile with an accepted request |
+| `caregiver.new@carelynk.test` | Caregiver | Blank profile for testing onboarding |
+
+Suggested reviewer flow:
+
+1. Use `caregiver.new@carelynk.test` to test caregiver onboarding.
+2. Use `seeker.demo@carelynk.test` to create, edit, delete, and match jobs.
+3. Open the seeded jobs to inspect matches and request statuses.
+4. Use `caregiver.demo@carelynk.test` to respond to the pending request.
+
 ### Run
 
 Backend:
@@ -213,11 +245,8 @@ npm run build
 
 ### Reviewer Quick Test
 
-1. Register a caregiver and save a Boston profile with skills such as `dementia care` and `meal prep`.
-2. Add caregiver availability for Monday and Wednesday from `09:00` to `13:00`.
-3. Register a care seeker and save a Boston-based profile.
-4. Create a job in Boston with requested weekdays Monday and Wednesday, preferred time `09:00` to `13:00`, and required skills `dementia care` and `meal prep`.
-5. Open the job matches page and confirm the caregiver appears with a high score and matching reasons for location, skills, and availability.
+Run `npm run db:seed`, start both applications, and use the demo credentials
+above to test onboarding, job management, matching, and caregiver requests.
 
 ### Build
 

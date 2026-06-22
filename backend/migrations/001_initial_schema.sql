@@ -1,23 +1,30 @@
 -- ============================================================================
--- DEPRECATED: This file has been replaced by the migrations system.
+-- Migration 001: Initial Schema
 -- ============================================================================
--- DO NOT USE THIS FILE DIRECTLY FOR NEW DATABASES
+-- This migration creates the base CareLynk database schema.
 --
--- Instead, use: backend/migrations/001_initial_schema.sql
+-- NOTE: This schema deliberately avoids PostgreSQL ENUM types in favor of
+-- TEXT columns with CHECK constraints. This provides better production flexibility:
 --
--- This file is kept for reference only. It previously used PostgreSQL ENUMs,
--- which have been replaced with TEXT columns + CHECK constraints for better
--- production flexibility and zero-downtime deployment support.
---
--- See: backend/migrations/002_architecture_decision_enums.md
+-- ✓ Easier schema evolution (add/remove values without table rewrites)
+-- ✓ Zero-downtime deployments (new code and old code coexist safely)
+-- ✓ Data migration flexibility (moving between environments is safer)
+-- ✓ Backward compatibility (no breaking schema changes)
+-- 
+-- For more details, see: backend/README.md#Schema-Migration-Strategy
 -- ============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
+-- ============================================================================
+-- Users Table
+-- ============================================================================
+-- Stores authentication and core user information for both caregivers 
+-- and care seekers. The 'role' column determines which profile table applies.
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  -- Note: role is now TEXT with CHECK constraint instead of ENUM
-  -- See migrations/002_architecture_decision_enums.md for rationale
+  -- Role is stored as TEXT with CHECK constraint instead of ENUM
+  -- Allowed values: 'caregiver', 'care_seeker'
   role TEXT NOT NULL CHECK (role IN ('caregiver', 'care_seeker')),
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
@@ -28,6 +35,10 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Caregiver Profiles
+-- ============================================================================
+-- Role-specific profile for caregivers. One-to-one relationship with users.
 CREATE TABLE IF NOT EXISTS caregiver_profiles (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   headline TEXT NOT NULL DEFAULT '',
@@ -43,6 +54,11 @@ CREATE TABLE IF NOT EXISTS caregiver_profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Caregiver Availabilities
+-- ============================================================================
+-- Weekly availability slots for caregivers. Supports recurring weekly schedules.
+-- weekday: 0 (Sunday) to 6 (Saturday)
 CREATE TABLE IF NOT EXISTS caregiver_availabilities (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   caregiver_user_id UUID NOT NULL REFERENCES caregiver_profiles(user_id) ON DELETE CASCADE,
@@ -54,6 +70,10 @@ CREATE TABLE IF NOT EXISTS caregiver_availabilities (
   CHECK (start_time < end_time)
 );
 
+-- ============================================================================
+-- Care Seeker Profiles
+-- ============================================================================
+-- Role-specific profile for care seekers. One-to-one relationship with users.
 CREATE TABLE IF NOT EXISTS care_seeker_profiles (
   user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   preferred_contact_method TEXT NOT NULL DEFAULT '',
@@ -67,6 +87,10 @@ CREATE TABLE IF NOT EXISTS care_seeker_profiles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Jobs
+-- ============================================================================
+-- Care jobs posted by care seekers. Includes location, timing, and requirements.
 CREATE TABLE IF NOT EXISTS jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   care_seeker_user_id UUID NOT NULL REFERENCES care_seeker_profiles(user_id) ON DELETE CASCADE,
@@ -84,8 +108,8 @@ CREATE TABLE IF NOT EXISTS jobs (
   requested_availabilities JSONB NOT NULL DEFAULT '[]'::jsonb,
   required_skills TEXT[] NOT NULL DEFAULT '{}',
   notes TEXT NOT NULL DEFAULT '',
-  -- Note: status is now TEXT with CHECK constraint instead of ENUM
-  -- See migrations/002_architecture_decision_enums.md for rationale
+  -- Status is stored as TEXT with CHECK constraint instead of ENUM
+  -- Allowed values: 'open', 'matched', 'closed'
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'matched', 'closed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -96,13 +120,11 @@ CREATE TABLE IF NOT EXISTS jobs (
   )
 );
 
-ALTER TABLE jobs
-ADD COLUMN IF NOT EXISTS requested_availabilities JSONB NOT NULL DEFAULT '[]'::jsonb;
-
-ALTER TABLE jobs
-ALTER COLUMN schedule_summary SET DEFAULT '',
-ALTER COLUMN frequency SET DEFAULT '';
-
+-- ============================================================================
+-- Job Matches
+-- ============================================================================
+-- Computed matches between caregivers and jobs. Used for displaying
+-- relevant opportunities to caregivers.
 CREATE TABLE IF NOT EXISTS job_matches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -113,12 +135,16 @@ CREATE TABLE IF NOT EXISTS job_matches (
   UNIQUE (job_id, caregiver_user_id)
 );
 
+-- ============================================================================
+-- Job Requests
+-- ============================================================================
+-- Requests sent to caregivers for specific jobs. Tracks status and communication.
 CREATE TABLE IF NOT EXISTS job_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   caregiver_user_id UUID NOT NULL REFERENCES caregiver_profiles(user_id) ON DELETE CASCADE,
-  -- Note: status is now TEXT with CHECK constraint instead of ENUM
-  -- See migrations/002_architecture_decision_enums.md for rationale
+  -- Request status is stored as TEXT with CHECK constraint instead of ENUM
+  -- Allowed values: 'pending', 'accepted', 'declined', 'cancelled'
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'cancelled')),
   message TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -126,6 +152,9 @@ CREATE TABLE IF NOT EXISTS job_requests (
   UNIQUE (job_id, caregiver_user_id)
 );
 
+-- ============================================================================
+-- Indexes
+-- ============================================================================
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
 CREATE INDEX IF NOT EXISTS idx_jobs_care_seeker_user_id ON jobs(care_seeker_user_id);
 CREATE INDEX IF NOT EXISTS idx_job_matches_job_id ON job_matches(job_id);
@@ -136,6 +165,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_job_requests_one_accepted
   WHERE status = 'accepted';
 CREATE INDEX IF NOT EXISTS idx_caregiver_availability_user_id ON caregiver_availabilities(caregiver_user_id);
 
+-- ============================================================================
+-- Data Normalization
+-- ============================================================================
+-- Ensure job status consistency: matched jobs without accepted requests
+-- are reset to 'open' status.
 UPDATE jobs
 SET status = 'open',
     updated_at = NOW()
@@ -146,4 +180,3 @@ WHERE status = 'matched'
     WHERE job_requests.job_id = jobs.id
       AND job_requests.status = 'accepted'
   );
-
